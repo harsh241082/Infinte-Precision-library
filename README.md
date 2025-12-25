@@ -1,1 +1,38 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-24ddc0f5d75046c5622901739e7c5dd533143b0c8e959d652212380cedb1ea36.svg)](https://classroom.github.com/a/aygKSLZt)
+# Infinite Precision Library
+
+A C++ library for performing arithmetic operations with arbitrary precision.
+
+## Features
+
+- High-precision integer arithmetic
+- Support for basic operations (addition, subtraction, multiplication, division)
+- Efficient computation for large numbers
+
+## Project Structure
+
+- `myinf_arth.hh` - Header file with class definitions
+- `my_inf_arith.cpp` - Implementation file
+- `inf_arth.cpp` - Additional arithmetic functions
+- `Makefile` - Build configuration
+
+## Building
+
+To compile the project, run:
+
+```bash
+make
+```
+
+## Usage
+
+Include the header file in your project:
+
+```cpp
+#include "myinf_arth.hh"
+```
+
+Then use the classes and functions for infinite precision arithmetic operations.
+
+## License
+
+Course Assignment - SDF
