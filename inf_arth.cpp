@@ -1,586 +1,703 @@
 #include "myinf_arth.hh"
-#include <cstring>
+#include <algorithm>
+#include <cctype>
 
 using namespace std;
 using namespace InfiniteArthmetic;
 
-string Integer::add(string num1, string num2)
+// ============================================================================
+// INTEGER CLASS IMPLEMENTATION
+// ============================================================================
+
+// Private Helper Methods
+
+bool Integer::isValidNumber(const string &s) const
+{
+    if (s.empty())
+        return false;
+
+    int start = 0;
+    if (s[0] == '-' || s[0] == '+')
+        start = 1;
+    if (start >= s.length())
+        return false;
+
+    for (int i = start; i < s.length(); i++)
+    {
+        if (s[i] == ',')
+            continue; // Allow commas as separators
+        if (!isdigit(s[i]))
+            return false;
+    }
+    return true;
+}
+
+void Integer::parse(string s)
+{
+    // Remove whitespace and validate
+    string cleaned;
+    bool hasMinusSign = false;
+
+    for (char c : s)
+    {
+        if (c == '-')
+            hasMinusSign = true;
+        else if (c != ' ' && c != ',')
+            cleaned += c;
+    }
+
+    if (cleaned.empty())
+    {
+        magnitude = "0";
+        isNegative = false;
+        return;
+    }
+
+    magnitude = cleaned;
+    isNegative = hasMinusSign;
+    trimLeadingZeros();
+}
+
+void Integer::trimLeadingZeros()
+{
+    size_t pos = 0;
+    while (pos < magnitude.length() - 1 && magnitude[pos] == '0')
+        pos++;
+    magnitude = magnitude.substr(pos);
+
+    if (magnitude == "0")
+        isNegative = false;
+}
+
+int Integer::compareMagnitudes(const string &num1, const string &num2) const
+{
+    if (num1.length() != num2.length())
+        return num1.length() < num2.length() ? -1 : 1;
+
+    return num1.compare(num2);
+}
+
+string Integer::addMagnitudes(const string &num1, const string &num2) const
 {
     string result;
     int carry = 0;
-    for (int i = 0; i < num1.size(); i++)
+    int i = num1.length() - 1;
+    int j = num2.length() - 1;
+
+    while (i >= 0 || j >= 0 || carry)
     {
-        int add = 0;
-        if (i < num2.size())
-        {
-            add = num1[num1.size() - 1 - i] - '0' + num2[num2.size() - 1 - i] - '0' + carry;
-        }
-        else
-        {
-            add = num1[num1.size() - 1 - i] - '0' + carry;
-        }
-        if (add >= 10)
-        {
-            add = add % 10;
-            carry = 1;
-        }
-        else
-        {
-            carry = 0;
-        }
-        result.insert(0, to_string(add));
-    }
-    if (carry == 1)
-    {
-        result.insert(0, to_string(carry));
+        int digit1 = i >= 0 ? num1[i] - '0' : 0;
+        int digit2 = j >= 0 ? num2[j] - '0' : 0;
+
+        int sum = digit1 + digit2 + carry;
+        result = char('0' + sum % 10) + result;
+        carry = sum / 10;
+
+        i--;
+        j--;
     }
 
     return result;
 }
-string Integer::subraact(string num1, string num2)
+
+string Integer::subtractMagnitudes(const string &num1, const string &num2) const
 {
+    // Assumes num1 >= num2 in magnitude
     string result;
     int borrow = 0;
-    for (int i = 0; i < num1.size(); i++)
-    {
-        int sub = 0;
-        if (i < num2.size())
-        {
-            sub = num1[num1.size() - 1 - i] - '0' - num2[num2.size() - 1 - i] + '0' - borrow;
-        }
-        else
-        {
-            sub = num1[num1.size() - 1 - i] - '0' - borrow;
-        }
+    int i = num1.length() - 1;
+    int j = num2.length() - 1;
 
-        if (sub < 0)
+    while (i >= 0)
+    {
+        int digit1 = num1[i] - '0';
+        int digit2 = j >= 0 ? num2[j] - '0' : 0;
+
+        int diff = digit1 - digit2 - borrow;
+        if (diff < 0)
         {
-            sub = sub + 10;
+            diff += 10;
             borrow = 1;
         }
         else
         {
             borrow = 0;
         }
-        result.insert(0, to_string(sub));
-    }
 
-    return result;
-}
-string Integer::multiply(string num1, string num2)
-{
-    string result(num1.size() + num2.size(), '0');
-    for (int i = 0; i < num1.size(); i++)
-    {
-        int carry = 0;
-        for (int j = 0; j < num2.size(); j++)
-        {
-            int mul = (num1[num1.size() - i - 1] - '0') * (num2[num2.size() - j - 1] - '0');
-            int sum = mul + (result[num1.size() + num2.size() - i - j - 1] - '0') + carry;
-            result[num1.size() + num2.size() - i - j - 1] = sum % 10 + '0';
-            carry = sum / 10;
-        }
-        result[num1.size() - i - 1] += carry;
-    }
-    while (result.size() > 1 && result[0] == '0')
-    {
-        result.erase(0, 1);
+        result = char('0' + diff) + result;
+        i--;
+        j--;
     }
 
     return result;
 }
 
-void Integer::parse()
+string Integer::multiplyMagnitudes(const string &num1, const string &num2) const
 {
-    int i = 0;
-    while (i != num.size())
+    int n = num1.length(), m = num2.length();
+    string result(n + m, '0');
+
+    for (int i = n - 1; i >= 0; i--)
     {
-        if (num[i] == ',')
+        for (int j = m - 1; j >= 0; j--)
         {
-            num.erase(i, 1);
-        }
-        else
-        {
-            i++;
+            int mul = (num1[i] - '0') * (num2[j] - '0');
+            int sum = mul + (result[i + j + 1] - '0');
+
+            result[i + j + 1] = char('0' + sum % 10);
+            result[i + j] += sum / 10;
         }
     }
+
+    // Remove leading zeros
+    size_t pos = 0;
+    while (pos < result.length() - 1 && result[pos] == '0')
+        pos++;
+
+    return result.substr(pos);
 }
-Integer::Integer()
+
+string Integer::divideMagnitudes(const string& num1, const string& num2) const
 {
-    num = "0";
+    // Long division algorithm
+    if (num2 == "0") return "0";  // Avoid division by zero
+    
+    if (compareMagnitudes(num1, num2) < 0) return "0";
+    
+    string quotient;
+    string current;
+    
+    for (int i = 0; i < num1.length(); i++)
+    {
+        current += num1[i];
+        
+        // Remove leading zeros from current
+        while (current.length() > 1 && current[0] == '0')
+            current = current.substr(1);
+        
+        // Find digit for quotient
+        int digit = 0;
+        while (digit <= 9)
+        {
+            string product = multiplyMagnitudes(num2, to_string(digit));
+            if (compareMagnitudes(product, current) > 0) break;
+            digit++;
+        }
+        digit--;
+        
+        quotient += char('0' + digit);
+        
+        // Subtract product from current
+        if (digit > 0)
+        {
+            string product = multiplyMagnitudes(num2, to_string(digit));
+            current = subtractMagnitudes(current, product);
+        }
+    }
+    
+    // Remove leading zeros
+    size_t pos = 0;
+    while (pos < quotient.length() - 1 && quotient[pos] == '0')
+        pos++;
+    
+    return quotient.substr(pos);
 }
+
+Integer::Integer() : magnitude("0"), isNegative(false) {}
+
 Integer::Integer(string s)
 {
-    num = s;
-    this->parse();
-}
-Integer::Integer(const Integer &I)
-{
-    num = I.getValue();
-    this->parse();parse();
+    parse(s);
 }
 
-Integer::~Integer()
-{
-}
+Integer::Integer(const Integer &I) : magnitude(I.magnitude), isNegative(I.isNegative) {}
+
+Integer::~Integer() {}
 
 string Integer::getValue() const
 {
-    return num;
+    if (magnitude == "0")
+        return "0";
+    return (isNegative ? "-" : "") + magnitude;
 }
 
-void Integer::Erase_minus()
+string Integer::getMagnitude() const
 {
-    num.erase(num.begin());
+    return magnitude;
 }
 
-void Integer::Erasezero()
+bool Integer::getSign() const
 {
-    while (1)
-    {
-        if (num.front() == '0')
-        {
-            num.erase(num.begin());
-        }
-        else
-        {
-            break;
-        }
-    }
+    return isNegative;
 }
 
-Integer Integer::operator+(Integer &number)
+void Integer::setValue(string s)
 {
-    Integer result;
-    Integer temp1 = *this;
-    Integer temp2 = number;
-    int choice;
-    if (temp1.num.front() == '-' && temp2.num.front() == '-')
-    {
-        temp1.Erase_minus();
-        temp2.Erase_minus();
-        choice = 1;
-    }
-    else if (temp1.num.front() == '-')
-    {
-        temp1.Erase_minus();
-        choice = 2;
-    }
-    else if (temp2.num.front() == '-')
-    {
-        temp2.Erase_minus();
-        choice = 3;
-    }
-    else
-    {
-        choice = 4;
-    }
-    temp1.Erasezero();
-    temp2.Erasezero();
-
-    int Choice = 0;
-    switch (choice)
-    {
-    case 1:
-    case 4:
-        if (temp1.num.size() > temp2.num.size())
-            Choice = 1;
-        else
-            Choice = 2;
-        switch (Choice)
-        {
-        case 1:
-            result.num = add(temp1.num, temp2.num);
-            result.Erasezero();
-            break;
-        case 2:
-            result.num = add(temp2.num, temp1.num);
-            result.Erasezero();
-            break;
-        default:
-            break;
-        }
-        break;
-    case 2:
-        if (temp2.num.size() == temp1.num.size())
-        {
-            int i = 0;
-
-            while (1)
-            {
-                if (temp1.num[i] < temp2.num[i])
-                {
-                    Choice = 3;
-                    break;
-                }
-                if (temp1.num[i] > temp2.num[i])
-                {
-                    Choice = 4;
-                    break;
-                }
-                if (i == (temp2.num.size() - 1))
-                {
-                    Choice = 5;
-                    break;
-                }
-                i++;
-            }
-        }
-        else
-        {
-            if (max(temp2.num.size(), temp1.num.size()) == temp2.num.size())
-                Choice = 1;
-            else
-                Choice = 2;
-        }
-        switch (Choice)
-        {
-        case 1:
-            result.num = subraact(temp2.num, temp1.num);
-            result.Erasezero();
-            break;
-        case 2:
-            result.num = subraact(temp1.num, temp2.num);
-            result.Erasezero();
-            result.num.insert(0, "-");
-            break;
-        case 3:
-            result.num = subraact(temp2.num, temp1.num);
-            result.Erasezero();
-            break;
-        case 4:
-            result.num = subraact(temp1.num, temp2.num);
-            result.Erasezero();
-            result.num.insert(0, "-");
-            break;
-        case 5:
-            result.num = "0";
-            break;
-        default:
-            break;
-        }
-        break;
-    case 3:
-        if (temp1.num.size() == temp2.num.size())
-        {
-            int i = 0;
-
-            while (1)
-            {
-                if (temp1.num[i] > temp2.num[i])
-                {
-                    Choice = 3;
-                    break;
-                }
-                if (temp1.num[i] < temp2.num[i])
-                {
-                    Choice = 4;
-                    break;
-                }
-                if (i == (temp1.num.size() - 1))
-                {
-                    Choice = 5;
-                    break;
-                }
-                i++;
-            }
-        }
-        else
-        {
-            if (max(temp1.num.size(), temp2.num.size()) == num.size())
-                Choice = 1;
-            else
-                Choice = 2;
-        }
-        switch (Choice)
-        {
-        case 1:
-            result.num = subraact(temp1.num, temp2.num);
-            result.Erasezero();
-            break;
-        case 2:
-            result.num = subraact(temp2.num, temp1.num);
-            result.Erasezero();
-            result.num.insert(0, "-");
-            break;
-        case 3:
-            result.num = subraact(temp1.num, temp2.num);
-            result.Erasezero();
-            break;
-        case 4:
-            result.num = subraact(temp2.num, temp1.num);
-            result.Erasezero();
-            result.num.insert(0, "-");
-            break;
-        case 5:
-            result.num = "0";
-            break;
-        default:
-            break;
-        }
-        break;
-    }
-    if (choice == 1)
-    {
-        result.num.insert(0, "-");
-    }
-
-    return result;
+    parse(s);
 }
 
-Integer &Integer::operator=(Integer &number)
+Integer &Integer::operator=(const Integer &number)
 {
-    num.assign(number.num);
+    magnitude = number.magnitude;
+    isNegative = number.isNegative;
     return *this;
 }
 
-Integer Integer::operator-(Integer &number)
-{
-    Integer temp = number;
-    if (temp.num.front() == '-')
-        temp.Erase_minus();
-    else
-        temp.num.insert(0, "-");
-    Integer result = *this + temp;
-    return result;
-}
-
-Integer Integer::operator*(Integer &number)
+Integer Integer::operator+(const Integer &number) const
 {
     Integer result;
-    Integer temp1 = *this;
-    Integer temp2 = number;
-    int choice = 0;
-    if (temp1.num == "0" || temp2.num == "0")
+
+    if (isNegative == number.isNegative)
     {
-        return result;
-    }
-    if (temp1.num.front() == '-' && temp2.num.front() == '-')
-    {
-        temp1.Erase_minus();
-        temp2.Erase_minus();
-        choice = 1;
-    }
-    else if (temp1.num.front() == '-')
-    {
-        temp1.Erase_minus();
-        choice = 2;
-    }
-    else if (temp2.num.front() == '-')
-    {
-        temp2.Erase_minus();
-        choice = 3;
+        // Same sign: add magnitudes
+        result.magnitude = addMagnitudes(magnitude, number.magnitude);
+        result.isNegative = isNegative;
     }
     else
     {
-        choice = 4;
-    }
-    temp1.Erasezero();
-    temp2.Erasezero();
+        // Different signs: subtract magnitudes
+        int cmp = compareMagnitudes(magnitude, number.magnitude);
 
-    string r = multiply(temp1.num, temp2.num);
-    result.num = r;
-    if (choice == 2 || choice == 3)
-    {
-        result.num.insert(0, "-");
+        if (cmp >= 0)
+        {
+            result.magnitude = subtractMagnitudes(magnitude, number.magnitude);
+            result.isNegative = isNegative;
+        }
+        else
+        {
+            result.magnitude = subtractMagnitudes(number.magnitude, magnitude);
+            result.isNegative = number.isNegative;
+        }
     }
 
+    result.trimLeadingZeros();
     return result;
 }
 
-
-Float::Float()
+Integer Integer::operator-(const Integer &number) const
 {
-    num = "0";
+    Integer negated = -number;
+    return *this + negated;
 }
+
+Integer Integer::operator*(const Integer &number) const
+{
+    Integer result;
+    result.magnitude = multiplyMagnitudes(magnitude, number.magnitude);
+    result.isNegative = (isNegative != number.isNegative) && result.magnitude != "0";
+    result.trimLeadingZeros();
+    return result;
+}
+
+Integer Integer::operator/(const Integer &number) const
+{
+    Integer result;
+    if (number.magnitude == "0") 
+        return Integer("0");  // Avoid division by zero
+    
+    result.magnitude = divideMagnitudes(magnitude, number.magnitude);
+    result.isNegative = (isNegative != number.isNegative) && result.magnitude != "0";
+    result.trimLeadingZeros();
+    return result;
+}
+
+Integer Integer::operator-() const
+{
+    Integer result = *this;
+    if (result.magnitude != "0")
+        result.isNegative = !result.isNegative;
+    return result;
+}
+
+bool Integer::operator==(const Integer &number) const
+{
+    return magnitude == number.magnitude && isNegative == number.isNegative;
+}
+
+bool Integer::operator<(const Integer &number) const
+{
+    if (isNegative != number.isNegative)
+        return isNegative;
+
+    int cmp = compareMagnitudes(magnitude, number.magnitude);
+    return isNegative ? cmp > 0 : cmp < 0;
+}
+
+bool Integer::operator>(const Integer &number) const
+{
+    return number < *this;
+}
+
+// ============================================================================
+// FLOAT CLASS IMPLEMENTATION
+// ============================================================================
+
+// Private Helper Methods
+
+bool Float::isValidFloat(const string &s) const
+{
+    if (s.empty())
+        return false;
+
+    bool hasDot = false;
+    int start = 0;
+    if (s[0] == '-' || s[0] == '+')
+        start = 1;
+
+    for (int i = start; i < s.length(); i++)
+    {
+        if (s[i] == '.')
+        {
+            if (hasDot)
+                return false;
+            hasDot = true;
+        }
+        else if (s[i] == ',')
+        {
+            continue;
+        }
+        else if (!isdigit(s[i]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+void Float::parse(string s)
+{
+    // Remove whitespace and commas
+    string cleaned;
+    bool hasMinusSign = false;
+    size_t dotPos = string::npos;
+
+    for (char c : s)
+    {
+        if (c == '-')
+            hasMinusSign = true;
+        else if (c != ' ' && c != ',')
+        {
+            if (c == '.')
+            {
+                if (dotPos != string::npos)
+                {
+                    // Multiple dots, take first
+                    continue;
+                }
+                dotPos = cleaned.length();
+            }
+            cleaned += c;
+        }
+    }
+
+    if (cleaned.empty())
+    {
+        integerPart = Integer("0");
+        decimalPart = Integer("0");
+        decimalPlaces = 0;
+        isNegative = false;
+        return;
+    }
+
+    // Split into integer and decimal parts
+    string intPart, decPart;
+
+    if (dotPos != string::npos)
+    {
+        intPart = cleaned.substr(0, dotPos);
+        decPart = cleaned.substr(dotPos + 1);
+        decimalPlaces = decPart.length();
+    }
+    else
+    {
+        intPart = cleaned;
+        decPart = "0";
+        decimalPlaces = 0;
+    }
+
+    if (intPart.empty())
+        intPart = "0";
+    if (decPart.empty())
+        decPart = "0";
+
+    integerPart = Integer(intPart);
+    decimalPart = Integer(decPart);
+    isNegative = hasMinusSign;
+
+    normalizeDecimal();
+}
+
+void Float::normalizeDecimal()
+{
+    // Remove trailing zeros from decimal part
+    string decStr = decimalPart.getMagnitude();
+    while (decStr.length() > 1 && decStr.back() == '0')
+    {
+        decStr.pop_back();
+        decimalPlaces--;
+    }
+
+    if (decStr == "0")
+        decimalPlaces = 0;
+    decimalPart = Integer(decStr);
+
+    // Ensure integer part is not negative
+    if (isNegative && integerPart.getMagnitude() == "0" && decimalPart.getMagnitude() == "0")
+        isNegative = false;
+}
+
+void Float::alignDecimalPlaces(Float &other)
+{
+    if (decimalPlaces < other.decimalPlaces)
+    {
+        string padding(other.decimalPlaces - decimalPlaces, '0');
+        decimalPart = Integer(decimalPart.getMagnitude() + padding);
+        decimalPlaces = other.decimalPlaces;
+    }
+    else if (other.decimalPlaces < decimalPlaces)
+    {
+        string padding(decimalPlaces - other.decimalPlaces, '0');
+        other.decimalPart = Integer(other.decimalPart.getMagnitude() + padding);
+        other.decimalPlaces = decimalPlaces;
+    }
+}
+
+// Public Methods
+
+Float::Float() : integerPart("0"), decimalPart("0"), decimalPlaces(0), isNegative(false) {}
+
 Float::Float(string s)
 {
-    num = s;
-    this->parse();
-}
-Float::Float(const Float &I)
-{
-
-    num = I.getValue();
-    this->parse();
+    parse(s);
 }
 
-Float::~Float()
-{
-}
+Float::Float(const Float &f) : integerPart(f.integerPart), decimalPart(f.decimalPart),
+                               decimalPlaces(f.decimalPlaces), isNegative(f.isNegative) {}
+
+Float::~Float() {}
 
 string Float::getValue() const
 {
-    return num;
-}
+    if (integerPart.getMagnitude() == "0" && decimalPart.getMagnitude() == "0")
+        return "0";
 
-void Float::Erasezero()
-{
-    while (!num.empty() && num.back() == '0' && num[num.size() - 2] != '.')
+    string result;
+    if (isNegative)
+        result += "-";
+
+    result += integerPart.getMagnitude();
+
+    if (decimalPlaces > 0)
     {
-        num.erase(num.end() - 1);
+        result += ".";
+        string decStr = decimalPart.getMagnitude();
+        // Pad with leading zeros if necessary
+        while (decStr.length() < decimalPlaces)
+            decStr = "0" + decStr;
+        result += decStr;
     }
+
+    return result;
 }
 
-void Float::parse()
+void Float::setValue(string s)
 {
-    int i = 0;
-    while (i != num.size())
-    {
-        if (num[i] == ',')
-        {
-            num.erase(i, 1);
-        }
-        else
-        {
-            i++;
-        }
-    }
+    parse(s);
 }
 
-Float &Float::operator=(Float &number)
+Float &Float::operator=(const Float &number)
 {
-    num = number.num;
+    integerPart = number.integerPart;
+    decimalPart = number.decimalPart;
+    decimalPlaces = number.decimalPlaces;
+    isNegative = number.isNegative;
     return *this;
 }
 
-Float Float::operator+(Float &number)
+Float Float::operator+(const Float &number) const
 {
-    string temp_string1 = this->getValue();
-    string temp_string2 = number.getValue();
-    bool has_decimal_1 = (temp_string1.find('.') != string::npos);
-    bool has_decimal_2 = (temp_string2.find('.') != string::npos);
+    Float a = *this;
+    Float b = number;
+    a.alignDecimalPlaces(b);
 
-    if (!has_decimal_1 && has_decimal_2)
+    // Convert to integers by treating as integers with decimal places
+    Integer intA(a.integerPart.getMagnitude() + a.decimalPart.getMagnitude());
+    Integer intB(b.integerPart.getMagnitude() + b.decimalPart.getMagnitude());
+
+    if (a.isNegative)
+        intA = -intA;
+    if (b.isNegative)
+        intB = -intB;
+
+    Integer sum = intA + intB;
+
+    Float result;
+    string sumStr = sum.getValue();
+    bool resultNegative = sum.getSign();
+
+    if (sumStr[0] == '-')
+        sumStr = sumStr.substr(1);
+
+    // Reconstruct float with proper decimal places
+    if (sumStr.length() <= a.decimalPlaces)
     {
-        temp_string1 += ".0";
-    }
-    else if (has_decimal_1 && !has_decimal_2)
-    {
-        temp_string2 += ".0";
-    }
-    else if (!has_decimal_1 && !has_decimal_2)
-    {
-        temp_string1 += ".0";
-        temp_string2 += ".0";
+        sumStr = string(a.decimalPlaces - sumStr.length() + 1, '0') + sumStr;
     }
 
-    int dot_index_1 = temp_string1.find('.');
-    int dot_index_2 = temp_string2.find('.');
-    if (dot_index_1 != string::npos)
-        temp_string1.erase(dot_index_1, 1);
-    if (dot_index_2 != string::npos)
-        temp_string2.erase(dot_index_2, 1);
+    size_t intPartLen = sumStr.length() - a.decimalPlaces;
+    string intPart = sumStr.substr(0, intPartLen);
+    string decPart = sumStr.substr(intPartLen);
 
-    int max_decimal_length = max(temp_string1.size() - dot_index_1, temp_string2.size() - dot_index_2);
-    int padding_length_1 = max_decimal_length - (temp_string1.size() - dot_index_1);
-    int padding_length_2 = max_decimal_length - (temp_string2.size() - dot_index_2);
+    if (intPart.empty())
+        intPart = "0";
+    if (decPart.empty())
+        decPart = "0";
 
-    temp_string1.append(padding_length_1, '0');
-    temp_string2.append(padding_length_2, '0');
+    result.integerPart = Integer(intPart);
+    result.decimalPart = Integer(decPart);
+    result.decimalPlaces = a.decimalPlaces;
+    result.isNegative = resultNegative && intPart != "0";
 
-    Integer int_temp1(temp_string1);
-    Integer int_temp2(temp_string2);
-    Integer int_temp3 = int_temp1 + int_temp2;
-
-    string temp_string3 = int_temp3.getValue();
-
-    temp_string3.insert(temp_string3.size() - max_decimal_length, 1, '.');
-    Float result(temp_string3);
-    result.Erasezero();
-
+    result.normalizeDecimal();
     return result;
 }
 
-Float Float::operator-(Float &number)
+Float Float::operator-(const Float &number) const
 {
-    string temp_string1 = this->getValue();
-    string temp_string2 = number.getValue();
-    bool has_decimal_1 = (temp_string1.find('.') != string::npos);
-    bool has_decimal_2 = (temp_string2.find('.') != string::npos);
+    return *this + (-number);
+}
 
-    if (!has_decimal_1 && has_decimal_2)
+Float Float::operator*(const Float &number) const
+{
+    // Multiply magnitudes and adjust decimal places
+    Integer intA(integerPart.getMagnitude() + decimalPart.getMagnitude());
+    Integer intB(number.integerPart.getMagnitude() + number.decimalPart.getMagnitude());
+
+    Integer product = intA * intB;
+
+    Float result;
+    string prodStr = product.getValue();
+
+    if (prodStr[0] == '-')
+        prodStr = prodStr.substr(1);
+
+    int newDecimalPlaces = decimalPlaces + number.decimalPlaces;
+
+    // Pad with zeros if necessary
+    if (prodStr.length() <= newDecimalPlaces)
     {
-        temp_string1 += ".0";
-    }
-    else if (has_decimal_1 && !has_decimal_2)
-    {
-        temp_string2 += ".0";
-    }
-    else if (!has_decimal_1 && !has_decimal_2)
-    {
-        temp_string1 += ".0";
-        temp_string2 += ".0";
+        prodStr = string(newDecimalPlaces - prodStr.length() + 1, '0') + prodStr;
     }
 
-    int dot_index_1 = temp_string1.find('.');
-    int dot_index_2 = temp_string2.find('.');
-    if (dot_index_1 != string::npos)
-        temp_string1.erase(dot_index_1, 1);
-    if (dot_index_2 != string::npos)
-        temp_string2.erase(dot_index_2, 1);
+    size_t intPartLen = prodStr.length() - newDecimalPlaces;
+    string intPart = prodStr.substr(0, intPartLen);
+    string decPart = prodStr.substr(intPartLen);
 
-    int max_decimal_length = max(temp_string1.size() - dot_index_1, temp_string2.size() - dot_index_2);
-    int padding_length_1 = max_decimal_length - (temp_string1.size() - dot_index_1);
-    int padding_length_2 = max_decimal_length - (temp_string2.size() - dot_index_2);
+    if (intPart.empty())
+        intPart = "0";
+    if (decPart.empty())
+        decPart = "0";
 
-    temp_string1.append(padding_length_1, '0');
-    temp_string2.append(padding_length_2, '0');
+    result.integerPart = Integer(intPart);
+    result.decimalPart = Integer(decPart);
+    result.decimalPlaces = newDecimalPlaces;
+    result.isNegative = (isNegative != number.isNegative) && intPart != "0";
 
-    Integer int_temp1(temp_string1);
-    Integer int_temp2(temp_string2);
-    Integer int_temp3 = int_temp1 - int_temp2;
-
-    string temp_string3 = int_temp3.getValue();
-    temp_string3.insert(temp_string3.size() - max_decimal_length, 1, '.');
-    Float result(temp_string3);
-    result.Erasezero();
-
+    result.normalizeDecimal();
     return result;
 }
 
-Float Float::operator*(Float &number)
+Float Float::operator/(const Float &number) const
 {
-    string temp_string1 = this->getValue();
-    string temp_string2 = number.getValue();
-    if (temp_string1 == "0" || temp_string2 == "0")
+    if (number.integerPart.getMagnitude() == "0" && number.decimalPart.getMagnitude() == "0")
     {
-        return Float("0");
-    }
-    bool has_decimal_1 = (temp_string1.find('.') != string::npos);
-    bool has_decimal_2 = (temp_string2.find('.') != string::npos);
-
-    if (!has_decimal_1 && has_decimal_2)
-    {
-        temp_string1 += ".0";
-    }
-    else if (has_decimal_1 && !has_decimal_2)
-    {
-        temp_string2 += ".0";
-    }
-    else if (!has_decimal_1 && !has_decimal_2)
-    {
-        temp_string1 += ".0";
-        temp_string2 += ".0";
+        return Float("0");  // Avoid division by zero
     }
 
-    int dot_index_1 = temp_string1.find('.');
-    int dot_index_2 = temp_string2.find('.');
-    if (dot_index_1 != string::npos)
-        temp_string1.erase(dot_index_1, 1);
-    if (dot_index_2 != string::npos)
-        temp_string2.erase(dot_index_2, 1);
-
-    int max_decimal_length = temp_string1.size() - dot_index_1 + temp_string2.size() - dot_index_2;
-
-    Integer int_temp1(temp_string1);
-    Integer int_temp2(temp_string2);
-    Integer int_temp3 = int_temp1 * int_temp2;
-
-    string temp_string3 = int_temp3.getValue();
-    temp_string3.insert(temp_string3.size() - max_decimal_length, 1, '.');
-    Float result(temp_string3);
-    result.Erasezero();
-
+    Float a = *this;
+    Float b = number;
+    
+    // Align decimal places for division
+    a.alignDecimalPlaces(b);
+    
+    // Precision: add extra decimal places for division (e.g., 10 more places)
+    int extraPrecision = 10;
+    string paddedA = a.integerPart.getMagnitude() + a.decimalPart.getMagnitude();
+    string paddedB = b.integerPart.getMagnitude() + b.decimalPart.getMagnitude();
+    
+    // Add zeros for precision
+    paddedA += string(extraPrecision, '0');
+    
+    Integer intA(paddedA);
+    Integer intB(paddedB);
+    
+    if (a.isNegative) intA = -intA;
+    if (b.isNegative) intB = -intB;
+    
+    Integer quotient = intA / intB;
+    
+    Float result;
+    string quotStr = quotient.getValue();
+    bool resultNegative = quotient.getSign();
+    
+    if (quotStr[0] == '-') quotStr = quotStr.substr(1);
+    
+    // Reconstruct float with correct decimal places
+    int resultDecimalPlaces = a.decimalPlaces + extraPrecision;
+    
+    if (quotStr.length() <= resultDecimalPlaces)
+    {
+        quotStr = string(resultDecimalPlaces - quotStr.length() + 1, '0') + quotStr;
+    }
+    
+    size_t intPartLen = quotStr.length() - resultDecimalPlaces;
+    string intPart = quotStr.substr(0, intPartLen);
+    string decPart = quotStr.substr(intPartLen);
+    
+    if (intPart.empty()) intPart = "0";
+    if (decPart.empty()) decPart = "0";
+    
+    result.integerPart = Integer(intPart);
+    result.decimalPart = Integer(decPart);
+    result.decimalPlaces = resultDecimalPlaces;
+    result.isNegative = resultNegative && intPart != "0";
+    
+    result.normalizeDecimal();
     return result;
+}
+
+Float Float::operator-() const
+{
+    Float result = *this;
+    if (result.integerPart.getMagnitude() != "0" || result.decimalPart.getMagnitude() != "0")
+        result.isNegative = !result.isNegative;
+    return result;
+}
+
+bool Float::operator==(const Float &number) const
+{
+    return getValue() == number.getValue();
+}
+
+bool Float::operator<(const Float &number) const
+{
+    Float a = *this;
+    Float b = number;
+    a.alignDecimalPlaces(b);
+
+    if (a.isNegative != b.isNegative)
+        return a.isNegative;
+
+    if (a.integerPart == b.integerPart)
+    {
+        Integer decCmp = a.decimalPart < b.decimalPart ? a.decimalPart : b.decimalPart;
+        return a.isNegative ? a.decimalPart > b.decimalPart : a.decimalPart < b.decimalPart;
+    }
+
+    return a.isNegative ? a.integerPart > b.integerPart : a.integerPart < b.integerPart;
+}
+
+bool Float::operator>(const Float &number) const
+{
+    return number < *this;
 }
